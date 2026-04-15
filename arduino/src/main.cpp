@@ -1,10 +1,39 @@
 #include <Arduino.h>
 #include <headers/stepper_controller.h>
 #include <headers/digital_button.h>
+#include <headers/dc_motor_controller.h>
 
 DigitalButton scanButton = DigitalButton();
-
 StepperController stepMotor;
+DCMotorController dcMotor;
+
+void handleScanPress();
+void handleSerialCommands();
+
+String inputBuffer = "";
+
+void setup()
+{
+  Serial.begin(9600);
+
+  dcMotor.begin();
+
+  scanButton.begin();
+  scanButton.onPress(handleScanPress);
+}
+
+void loop()
+{
+  scanButton.loop();
+  handleSerialCommands();
+  stepMotor.TurnStep();
+
+  // if (startNextAngle)
+  // {
+  //   startNextAngle = false;
+  //   stepMotor.SetTarget(angleQueue[queueIndex++], onAngleComplete);
+  // }
+}
 
 void startScan()
 {
@@ -20,14 +49,6 @@ void handleScanPress()
   stepMotor.SetTarget(1, []()
                       { startScan(); },
                       15); // reset position for scan
-}
-
-void setup()
-{
-  Serial.begin(9600);
-
-  scanButton.begin();
-  scanButton.onPress(handleScanPress);
 }
 
 int angleQueue[50];
@@ -83,18 +104,9 @@ void handleSerialCommands()
       Serial.println("Stored ANGLES: " + data);
       handleStoredAngles(data);
     }
+    else
+    {
+      dcMotor.handleCommand(cmd);
+    }
   }
-}
-
-void loop()
-{
-  scanButton.loop();
-  handleSerialCommands();
-  stepMotor.TurnStep();
-
-  // if (startNextAngle)
-  // {
-  //   startNextAngle = false;
-  //   stepMotor.SetTarget(angleQueue[queueIndex++], onAngleComplete);
-  // }
 }
