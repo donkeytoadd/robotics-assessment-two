@@ -5,6 +5,10 @@ import cv2
 from ultralytics import YOLO
 import time
 import threading
+import stream_server
+enableCameraFeed = False
+if(enableCameraFeed):
+    stream_server.start()
 
 angles = []
 
@@ -31,6 +35,9 @@ def camera_thread():
         frame = picam2.capture_array()
         with frame_lock:
             latest_frame = frame
+        if(enableCameraFeed):
+            results = model(frame, verbose=False, imgsz=256, classes=[0])
+            stream_server.set_frame(results[0].plot())
 
 t = threading.Thread(target=camera_thread, daemon=True)
 t.start()
@@ -85,6 +92,8 @@ def detect_human():
         return False
 
     results = model(frame, verbose=False, imgsz=256)
+    if(enableCameraFeed):
+        stream_server.set_frame(results[0].plot())
     return is_centered_human(results, frame.shape[1])
 
 def captureAngle():
