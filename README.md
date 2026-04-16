@@ -2,7 +2,7 @@
 
 An Arduino + Raspberry Pi project that automates shuffling and dealing a deck of playing cards. The machine scans around the table to detect and locate players, then deals cards to each player in turn.
 
-## System Overview
+## Overview
 
 The machine is built in three stacked layers:
 
@@ -16,19 +16,19 @@ The machine is built in three stacked layers:
 └─────────────────────────┘
 ```
 
-### Layer 1 — Rotating Platform (bottom)
+### Layer 1 - Rotating Platform (bottom)
 
-- **Arduino Uno** drives a **28BYJ-48 stepper motor** via pins 8–11
+- **Arduino Uno** drives a stepper motor via pins 8–11
 - **Raspberry Pi** (mounted on the platform) runs a YOLOv8 person-detection model via PiCamera2
 - On scan start, the platform performs one full 360° rotation; whenever a centered person is detected the Pi requests the current angle from the Arduino and stores it
 - After the scan completes, all captured player angles are sent back to the Arduino so the platform can rotate to each player position during dealing
 
-### Layer 2 — Card Magazine (middle)
+### Layer 2 - Card Magazine (middle)
 
 - Sits directly above the platform
 - A **DC motor** (connected via an H-bridge to Arduino pins 9/10) drives a wheel that ejects cards one at a time when a `DISPENSE` command is received
 
-### Layer 3 — Card Shuffler (top)
+### Layer 3 - Card Shuffler (top)
 
 - A split deck is loaded into two chutes
 - A **DC motor** (H-bridge, Arduino pins 5/6) interleaves the two halves when a `SHUFFLE` command is received
@@ -54,9 +54,9 @@ The machine is built in three stacked layers:
 | Arduino Uno | 1 | - |
 | Raspberry Pi (3B+ or 4) | 1 | Must support PiCamera2 |
 | Raspberry Pi Camera Module v2/v3 | 1 | |
-| 28BYJ-48 stepper motor + ULN2003 driver | 1 | Platform rotation |
+| Stepper motor + driver | 1 | Platform rotation |
 | DC motor (5–9 V) | 2 | One for shuffler, one for dispenser |
-| L298N (or similar) H-bridge module | 1–2 | Motor driver for DC motors |
+| L2983D (or similar) H-bridge | 1–2 | Motor driver for DC motors |
 | Push button | 1 | Triggers scan sequence (Arduino digital pin 2) |
 | Jumper wires, power supply, frame/chassis | — | |
 
@@ -64,7 +64,14 @@ The machine is built in three stacked layers:
 
 #### Stepper (platform rotation)
 
+| Arduino Pin | Function |
+|-------------|----------|
+| 8 | Coil A (IN1) |
+| 9 | Coil B (IN2) |
+| 10 | Coil C (IN3) |
+| 11 | Coil D (IN4) |
 
+> **Note:** the `Stepper` library is initialised with pins in the order `8, 10, 9, 11` to match the coil wiring sequence required for correct rotation direction. See [stepper_controller.cpp](arduino/lib/servo_controller/implementations/stepper_controller.cpp) line 8.
 
 #### DC Motors (H-bridge)
 
@@ -111,7 +118,7 @@ pyserial
 2. PlatformIO will automatically resolve the `Stepper` library dependency.
 3. Connect the Arduino Uno via USB.
 4. Click **Upload** in PlatformIO (or run `pio run --target upload` in the terminal).
-5. Open the Serial Monitor at **9600 baud** to observe debug output.
+5. Open the Serial Monitor to observe debug output.
 
 ```bash
 # From the arduino/ directory
@@ -159,7 +166,7 @@ In [main.py](raspberry_pi/main.py), set:
 enableCameraFeed = True
 ```
 
-The annotated MJPEG stream will be available at `http://<pi-ip>:8080/stream` once running.
+The annotated stream will be available at `http://<pi-ip>:8080/stream` once running.
 
 ### 5. Run
 
@@ -186,7 +193,7 @@ python main.py
 
 ### Manual Serial Commands
 
-Connect a serial terminal (9600 baud) to the Arduino or send commands from the Pi:
+Connect a serial terminal to the Arduino or send commands from the Pi:
 
 | Command | Effect |
 |---------|--------|
@@ -217,7 +224,6 @@ These can be changed at runtime with the `SET_*` serial commands above, or adjus
 
 **Motor torque is insufficient when fully assembled.** When all three layers are stacked (platform + magazine + shuffler), the combined weight exceeds what the current motors can reliably move. Potential remedies:
 
-- Replace the 28BYJ-48 stepper with a higher-torque stepper (e.g. NEMA 17) and a suitable driver (e.g. A4988/DRV8825).
 - Use a higher-voltage, higher-current DC motor for the shuffler and dispenser, and a matched H-bridge capable of supplying the required current.
 - Power the motors from a dedicated external supply rather than relying on the Arduino's 5 V rail.
 - Reduce the physical weight of the upper layers by redesigning the frame with lighter materials.
