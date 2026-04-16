@@ -6,29 +6,44 @@ from ultralytics import YOLO
 import time
 import threading
 import stream_server
+
 enableCameraFeed = False
 if(enableCameraFeed):
     stream_server.start()
 
+# list of angles where a person was detected during a scan, this is sent to the Arduino after STOP is received
 angles = []
 
+# tracks the last time a detection was acted on, used to enforce a cooldown between captures
 last_sent = 0
+# seconds to wait between successive angle captures
 cooldown = 1
 
+# open serial connection to the Arduino
 ser = serial.Serial('/dev/ttyACM0', 9600)
 isScanning = False
+
+# configure the camera for a small frame to maintain performance
 picam2 = Picamera2()
 picam2.configure(picam2.create_preview_configuration(
     main={"format": "RGB888", "size": (320, 240)}
 ))
 picam2.start()
-time.sleep(2)  # warm up
+time.sleep(2)
+
+# load the YOLOv8 model
 model = YOLO("yolov8n.pt")
+
+# frame counter used to throttle how often YOLO inference is run
 counter = 0
 
+# latest_frame is written by the camera thread and read by the main loop
+# frame_lock ensures reads and writes don't race
 latest_frame = None
 frame_lock = threading.Lock()
 
+# runs in a background thread to continuously capture frames from the camera.
+# if the stream feed is enabled, also runs inference and pushes annotated frames to the server
 def camera_thread():
     global latest_frame
     while True:
@@ -42,6 +57,8 @@ def camera_thread():
 t = threading.Thread(target=camera_thread, daemon=True)
 t.start()
 
+# serialises the collected angles as a comma-separated string and sends them to the Arduino.
+# the Arduino will then move the turntable to each angle in sequence to dispense cards
 def sendStoredAngles():
     if angles:
       message = ",".join(str(a) for a in angles)
@@ -50,6 +67,8 @@ def sendStoredAngles():
     else:
       print("No angles to send.")
 
+# reads one line from serial if available and handles scan lifecycle commands from the Arduino.
+# SCAN/STOP control the scanning state, ANGLE responses are stored for later
 def handle_serial_commands():
     global isScanning
     if ser.in_waiting > 0:
@@ -69,6 +88,7 @@ def handle_serial_commands():
             print(f"Captured angle: {angle}")
             return
 
+# checks whether any detected person's bounding box centre falls within tolerance pixels of the horizontal centre of the frame
 def is_centered_human(results, frame_width, tolerance=80):
     center_x = frame_width / 2
     for box in results[0].boxes:
@@ -80,6 +100,8 @@ def is_centered_human(results, frame_width, tolerance=80):
             return True
     return False
 
+# grabs the latest camera frame and runs YOLO inference on every 3rd call
+# returns True if a centred person is detected in the current frame
 def detect_human():
     global counter
     with frame_lock:
@@ -96,10 +118,13 @@ def detect_human():
         stream_server.set_frame(results[0].plot())
     return is_centered_human(results, frame.shape[1])
 
+# sends a CAPTURE_ANGLE command to the Arduino, which responds with the turntable's current angle
 def captureAngle():
     global angles
     ser.write(b"CAPTURE_ANGLE\n")
 
+# main loop which continuously polls for serial commands and, when in scan mode,
+# checks for human detections and capture the turntable angle
 while True:
     handle_serial_commands()
     if isScanning:
