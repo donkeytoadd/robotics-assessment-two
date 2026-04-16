@@ -3,10 +3,10 @@
 // sets variables for dc motors, allows for speed and duration of each motor to be adjusted
 DCMotorController::DCMotorController()
 {
-    shuffleSpeed = 200;
+    shuffleSpeed = 250;
     dispenseSpeed = 250;
     shuffleDuration = 5000;
-    dispenseDuration = 300;
+    dispenseDuration = 2000;
 }
 
 // configures relevant pins to behave as outputs to the motors
